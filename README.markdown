@@ -5,8 +5,13 @@ Database for recording lab usage.
 
 ## Install
 
+### Install Dependencies
+
     $ sudo pip install -r requirements.txt
-    $ sudo python setup.py install
+
+### Initilize The Database
+
+    $ ./lid-tracking.py --init
 
 
 ## Run
