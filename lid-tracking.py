@@ -3,11 +3,12 @@ import os
 import sys
 from sqlalchemy import Column, ForeignKey, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy import create_engine
 from RPi import GPIO
 import argparse
 import time
+import datetime
 import threading
 
 Base = declarative_base()
@@ -18,7 +19,7 @@ reading = None
 
 parser = argparse.ArgumentParser(description='L.I.D. User timestamp database')
 parser.add_argument('--init', action="store_true", help='Initilize the database. WARNING: This can destroy data')
-
+parser.add_argument('--report', action="store_true", help='Run a test report against the database')
 
 class Person(Base):
     __tablename__ = 'person'
@@ -44,7 +45,6 @@ def data_pulse(arg):
         reading += 1
     if arg == 24:
         reading = reading << 1
-        #reading += 1
 
 
 def kick_timer():
@@ -53,13 +53,39 @@ def kick_timer():
         threading.Timer(0.2, wiegand_stream_done).start()
         reading = 0
 
+def leds_off():
+    GPIO.output(27, GPIO.HIGH)
+
 def wiegand_stream_done():
     global reading
-    print "Badge number: %7d" % ((reading&0x0003fffe) >> 1)
+    badgeno = (reading&0x0003fffe) >> 1
     reading = None
 
+    # Check case for potentially garbage data
+    if badgeno < 1000:
+        return
 
-# Initilize
+    print "Badge Scaned: %7d" % badgeno
+
+    engine = create_engine('sqlite:///'+DATABASE_FILE)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    person =  session.query(Person).filter(Person.id == badgeno).first()
+    if person is None:
+        person = Person(id=badgeno, name="Nathan", email="mail@example.com", industry="ECE Staff")
+        session.add(person)
+
+    GPIO.output(27, GPIO.LOW)
+    threading.Timer(0.35, leds_off).start()
+
+
+    newcheckin = Timetable(person=person, timein=datetime.datetime.now())
+    session.add(newcheckin)
+    session.commit()
+
+
+# Initilize Database WARNING: Will destroy data
 def init():
     engine = create_engine('sqlite:///'+DATABASE_FILE)
     Base.metadata.create_all(engine)
@@ -67,7 +93,6 @@ def init():
 
 if __name__ == '__main__':
     args = vars(parser.parse_args())
-    print args
 
     if args['init']:
         if os.path.isfile(DATABASE_FILE):
@@ -77,9 +102,24 @@ if __name__ == '__main__':
                 exit(0)
         init()
 
+
+    if args['report']:
+        engine = create_engine('sqlite:///'+DATABASE_FILE)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        data = session.query(Person).all()
+        for d in data:
+            print d.id, d.name, d.industry
+            for line in session.query(Timetable).filter(Timetable.person == d).all():
+                print "    - Badgein:", line.timein
+        exit(0)
+
+
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(23, GPIO.IN)
     GPIO.setup(24, GPIO.IN)
+    GPIO.setup(27, GPIO.OUT)
+    GPIO.output(27, GPIO.HIGH)
     GPIO.add_event_detect(23, GPIO.FALLING, callback=data_pulse)
     GPIO.add_event_detect(24, GPIO.FALLING, callback=data_pulse)
 
