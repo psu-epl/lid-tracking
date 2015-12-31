@@ -73,10 +73,14 @@ def wiegand_stream_done():
 
     person =  session.query(Person).filter(Person.id == badgeno).first()
     if person is None:
-        person = Person(id=badgeno, name="Nathan", email="mail@example.com", industry="ECE Staff")
+        print "Hi! This is your first time scanning in."
+        nameinput, emailinput, industryinput = ask_details()
+        person = Person(id=badgeno, name=nameinput, email=emailinput, industry=industryinput)
         session.add(person)
-
-    GPIO.output(27, GPIO.LOW)
+        print "Thanks!"
+        GPIO.output(27, GPIO.LOW)
+    else:
+        GPIO.output(27, GPIO.LOW)
     threading.Timer(0.35, leds_off).start()
 
 
@@ -84,6 +88,19 @@ def wiegand_stream_done():
     session.add(newcheckin)
     session.commit()
 
+
+def ask_details():
+    nameinput = str(raw_input('Please enter your name: '))
+    emailinput = str(raw_input('Please enter your email: '))
+    industryinput = str(raw_input('Please enter your Industry or Major: '))
+
+    print "Hi", nameinput, "is this correct?:"
+    print emailinput
+    print industryinput
+    yn = str(raw_input('[y/n] '))
+    if 'n' in yn.lower():
+        ask_details()
+    return nameinput, emailinput, industryinput
 
 # Initilize Database WARNING: Will destroy data
 def init():
@@ -101,6 +118,7 @@ if __name__ == '__main__':
                 print "Aborting."
                 exit(0)
         init()
+        exit(0)
 
 
     if args['report']:
