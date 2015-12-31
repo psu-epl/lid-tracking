@@ -17,6 +17,8 @@ DATABASE_FILE = 'data.db'
 
 reading = None
 
+RED_LED = 22
+
 parser = argparse.ArgumentParser(description='L.I.D. User timestamp database')
 parser.add_argument('--init', action="store_true", help='Initilize the database. WARNING: This can destroy data')
 parser.add_argument('--report', action="store_true", help='Run a test report against the database')
@@ -53,8 +55,11 @@ def kick_timer():
         threading.Timer(0.2, wiegand_stream_done).start()
         reading = 0
 
+
 def leds_off():
     GPIO.output(27, GPIO.HIGH)
+    GPIO.output(RED_LED, GPIO.HIGH)
+
 
 def wiegand_stream_done():
     global reading
@@ -73,6 +78,8 @@ def wiegand_stream_done():
 
     person =  session.query(Person).filter(Person.id == badgeno).first()
     if person is None:
+        GPIO.output(RED_LED, GPIO.LOW)
+        threading.Timer(1.5, leds_off).start()
         print "Hi! This is your first time scanning in."
         nameinput, emailinput, industryinput = ask_details()
         person = Person(id=badgeno, name=nameinput, email=emailinput, industry=industryinput)
@@ -137,7 +144,9 @@ if __name__ == '__main__':
     GPIO.setup(23, GPIO.IN)
     GPIO.setup(24, GPIO.IN)
     GPIO.setup(27, GPIO.OUT)
+    GPIO.setup(RED_LED, GPIO.OUT)
     GPIO.output(27, GPIO.HIGH)
+    GPIO.output(RED_LED, GPIO.HIGH)
     GPIO.add_event_detect(23, GPIO.FALLING, callback=data_pulse)
     GPIO.add_event_detect(24, GPIO.FALLING, callback=data_pulse)
 
