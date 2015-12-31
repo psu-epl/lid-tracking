@@ -99,7 +99,7 @@ def ask_details():
     print industryinput
     yn = str(raw_input('[y/n] '))
     if 'n' in yn.lower():
-        ask_details()
+        nameinput, emailinput, industryinput = ask_details()
     return nameinput, emailinput, industryinput
 
 # Initilize Database WARNING: Will destroy data
