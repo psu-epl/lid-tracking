@@ -24,12 +24,66 @@ import datetime
 import threading
 import Server
 import Gui
+import RPi.GPIO as GPIO
+
 from time import sleep
 #command line arguments 
 parser = argparse.ArgumentParser(description='L.I.D. User timestamp database')
 parser.add_argument('--init', action="store_true", help='Initilize the database. WARNING: This can destroy data')
 parser.add_argument('--report', action="store_true", help='Run a test report against the database')
 parser.add_argument('--debug', action="store_true",help='Set log level to Debug')
+########################################################################
+
+reading =None
+unknownusercallback = None
+knownusercallback = None
+
+
+
+def checkgoodreading():
+	global reading
+	global knownusercallback
+	global unknownusercallback
+	global _DataBase
+
+	badgeno = (reading & 0x000fffff)>>1
+	reading = None
+	
+        	
+	if badgeno <1000:
+		return 
+	if badgeno >9999999:
+		return 
+		
+	logger.debug('badge scanned: %7d'%badgeno)
+	found = False
+	for row in _DataBase.GetUsers():
+		if row.id == badgeno:
+			pers = persontojson(row)
+			found = True
+	if found:
+		_DataBase.DelNotes(pers[0])
+		_DataBase.AddTime(pers[0],datetime.datetime.now())
+		#UserClockRecord(self,notes,id,name):
+		knownusercallback(str(pers[2]),pers[0],str(pers[1]))
+	else:
+		unknownusercallback(badgeno)
+
+
+def persontojson(row):
+	return [row.id,row.name,row.usernotes]
+
+def data_pulse(arg):
+	global reading
+	if reading == None:
+		reading = 0
+		threading.Timer(.5, checkgoodreading).start()
+	if arg == 23:
+		reading = reading <<1
+		reading += 1
+	if arg == 24:
+		reading = reading <<1
+
 
 ########################################################################
 ## main 
@@ -46,6 +100,7 @@ def main():
 	logger.warning('LID Tracking started')
 	print 'LID Tracking'
 
+	global _DataBase
     # if database not exists then create it...
 	if not os.path.exists(Globalconstants.DATABASE_FILE):
 		_DataBase.New_DB_Create()
@@ -54,10 +109,13 @@ def main():
 		if not _DataBase.Try_Connect():
 			exit
 	#set server Database 
-	Server._DataBase = _DataBase
+	#Server._DataBase = _DataBase
 	#start server 
 	Server.start_server()
 	
+	global knownusercallback
+	global unknownusercallback 
+
 	# gui init group sets up the screen for gui 
 	root=Gui.tk.Tk()
 	app=Gui.FullScreenApp(root)
@@ -72,12 +130,17 @@ def main():
 	app.setdelnotecallback(_DataBase.DelNotes)
 	# get the callback function for clock record
 		#UserClockRecord(self,notes,id,name)
-	knowncusercallback = app.getknownusercallback(root)
+	knownusercallback = app.getknownusercallback(root)
+
+	GPIO.setmode(GPIO.BCM)
+	GPIO.setup(23, GPIO.IN)
+	GPIO.setup(24, GPIO.IN)	
+	GPIO.add_event_detect(23, GPIO.FALLING, callback=data_pulse)
+	GPIO.add_event_detect(24, GPIO.FALLING, callback=data_pulse)
+
 	
 	
-	
-	
-	#thread = threading.Thread(target=knowncusercallback,args=['Notes',1,'name'])
+	#thread = threading.Thread(target=unknownusercallback,args=[155802])
 	#thread.start()
 	# start the gui .... note if gui is closed program will stop 
 	# while loop should restart gui in case it is closed 
@@ -88,7 +151,12 @@ def main():
 	
 	root.mainloop()
 
-	
+#global unknownusercallback
+#global knownusercallback
+#global reading 
+#reading =None
+#unknownusercallback = None
+#knowncusercallback = None
 
 # caller for main 
 if __name__ == '__main__': 

@@ -41,7 +41,7 @@ class Person(Base):
 	notes		= Column(mysql.TEXT(charset='unicode'),nullable=False)
 	usernotes	= Column(mysql.TEXT(charset='unicode'),nullable=False)
 	def __str__(self):
-		return str(self.id)+self.name+self.email+self.industry+role+created+major+notes
+		return str(self.id)+','+self.name+','+self.email+','+self.industry+','+role+','+created+','+major+','+notes+','
 	
 
 ## Class for table in Time table 
@@ -81,27 +81,40 @@ class DataBase():
 	
 	# add a new person 
 	def AddUser(self,Person):
-		self.session.add(Person)
-		self.session.commit()
+		try:
+			self.session.add(Person)
+			self.session.commit()
+		except:
+			self.session.rollback()
 
 	# get users list 
 	def GetUsers(self):
-		return self.session.query(Person).all()
+		try:
+			return self.session.query(Person).all()
+		except:
+			self.session.rollback()
 	
+		
 	# get time table by person ID # note if DB gets large this is to keep total query size down
 	# there should be no query to return the entire table at once.
 	def GetTimes(self,Pid):
-		return self.session.query(Timetable).filter(Timetable.person_id==Pid)
+		try:
+			return self.session.query(Timetable).filter(Timetable.person_id==Pid)
+		except:
+			self.session.rollback()
 	
 	# new user callback create a new user from items 
 	def NewUser(self,_id,_name='',_email='',_industry='',_trained = 0,_role='user',_major='',_notes='',_usernotes=''):			
-		p = Person(id=int(_id),name=_name,email=_email,industry=_industry,trained=_trained,role=_role,created=datetime.datetime.now(),major=_major,notes=_notes,usernotes=_usernotes)
+		logger.debug('in new user call')
+		p = Person(id=int(_id),name=_name,email=_email,industry=_industry,trained=int(_trained),role=_role,created=datetime.datetime.now(),major=_major,notes=_notes,usernotes=_usernotes)
+		logger.debug('new person obj created');
 		try:
 			self.session.add(p)
+			self.session.commit()
 			logger.debug('Added user id %d'%int(_id))
 			logger.debug('user name %s'%_name)
-			self.session.commit()
-		except:
+		except Exception as e:
+			logger.debug(str(e))
 			self.session.rollback()
 			logger.debug('  user id %d'%int(_id))
 			logger.debug(' name %s'%_name)
@@ -115,26 +128,44 @@ class DataBase():
 	
 	# edit a user 
 	def EditUser(self,_id,_name,_email,_industry,_trained,_role,_major,_notes,_usernotes):
-		self.session.query(Person).\
-			filter(Person.id ==_id).\
-			update({ 'name':_name,'email':_email,'industry':_industry,'trained':_trained,'role':_role,'major':_major,'notes':_notes,'usernotes':_usernotes})
-		self.session.commit()
+		try:
+			self.session.query(Person).\
+				filter(Person.id ==_id).\
+				update({ 'name':_name,'email':_email,'industry':_industry,'trained':_trained,'role':_role,'major':_major,'notes':_notes,'usernotes':_usernotes})
+			self.session.commit()
+		except:
+			self.session.rollback()
+	
+	#remove notes that have been shown 
+	def DelNotes(self,_id):
+		logger.debug(' notes are being deleted')
+		try:
+			self.session.query(Person).\
+				filter(Person.id ==_id).\
+				update({'usernotes':""})
+			self.session.commit()
+		except:	
+			self.session.rollback()
+			
 		
 	def DelUser(self,_id):
-		self.session.query(Person).\
-			filter(Person.id == _id).\
-			delete()
-		self.session.commit()
-		
+		try:
+			self.session.query(Person).\
+				filter(Person.id == _id).\
+				delete()
+			self.session.commit()
+		except:
+			self.session.rollback()
 		
 	#Add Time Record 
 	def AddTime(self,_id,_time):
-		tm = Timetable(_id,_time)
+		tm = Timetable(person_id=_id,timein=_time);
 		try:
 			self.session.add(tm)
 			self.session.commit()
 		except:
 			logger.debug('unable to add time record')
+			self.session.rollback()
 	
 	def DelNotes(self,_id):
 		pass

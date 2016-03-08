@@ -3,15 +3,20 @@ import Tkinter as tk
 from time import sleep
 from Logging import logger
 from datetime import datetime
+import DataBase
 
 global root
+global Gui_DataBase
+Gui_DataBase = DataBase.DataBase()
+Gui_DataBase.Try_Connect()
 
 class NewUserDialog:
-	newusercallback = None
+	#newusercallback = None
 	IDNum = None
 	top = None
-	def __init__(self,parent,newusercallback,IDNum):
-		self.newusercallback = newusercallback
+	#def __init__(self,parent,newusercallback,IDNum):
+	def __init__(self,parent,IDNum):
+		#self.newusercallback = newusercallback
 		top = self.top =tk.Toplevel(parent)
 		top.geometry("{0}x{1}+0+0".format(500, 500))
 		tk.Label(top,text='User ID was not found please enter new user details below.').pack()
@@ -35,27 +40,28 @@ class NewUserDialog:
 		self.major = tk.Entry(top)
 		self.major.pack(padx=5)
 		self.btnok = tk.Button(top,text='OK',command=self.ok).pack()
+		
 	def ok(self):
+		global Gui_DataBase
 		try:
 			if(self.IDNum ==None):
-				self.newusercallback(int(self.id.get()),self.name.get(),self.email.get(),self.industry.get(),0,'user',self.major.get(),'','')
+				Gui_DataBase.NewUser(int(self.id.get()),self.name.get(),self.email.get(),self.industry.get(),0,'user',self.major.get(),'','')
 				self.IDNum = int(self.id.get())
 			else:
-				self.newusercallback(self.IDNum,self.name.get(),self.email.get(),self.industry.get(),0,'user',self.major.get(),'','')
+				Gui_DataBase.NewUser(int(self.IDNum)   ,self.name.get(),self.email.get(),self.industry.get(),0,'user',self.major.get(),'','')
 			self.top.destroy()
 		except:
 			tk.Label(self.top,text='Unable to adduser please check input').pack()
 			
 class userclockDialog:
-	def __init__(self,parent,callback,notes,id,name):
-		self.DelNotes = callback
+	def __init__(self,parent,notes,id,name):
 		top = self.top = tk.Toplevel(parent)
 		top.geometry("{1}x{1}+0+0".format(500, 500))
 		tk.Label(top,text='Notes for %s'%name).pack()
 		tk.Label(top,text=notes).pack()
 		strtime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 		tk.Label(top,text='User was logged at %s'%strtime)
-		self.top.after(5000,self.top.destroy)
+		self.top.after(30000,self.top.destroy)
 		
 		
 		
@@ -124,23 +130,18 @@ class FullScreenApp(object):
 		global root
 		if self.newusercallback == None:
 			raise Exception('No callback set')
-		dialog = NewUserDialog(root,self.newusercallback,_id)
+		dialog = NewUserDialog(root,_id)
 		root.wait_window(dialog.top)
 
 	# this function to be called from main program on user badge scann 
 	#self,parent,callback,notes,id,name
 	def UserClockRecord(self,notes,id,name):
-		sleep(5)
 		global root
 		if self.delnotecallback ==None:
 			raise Exception('No Delnote callback set')
-		dialog = userclockDialog(root,self.delnotecallback,notes,id,name)
+		dialog = userclockDialog(root,notes,id,name)
 		root.wait_window(dialog.top)
 		
-
-
-
-
 		
 	def funccall(self,function):
 		function()

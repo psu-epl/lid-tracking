@@ -7,7 +7,7 @@ import json
 import copy
 import sqlite3
 import lidtracking
-
+import DataBase
 from Globalconstants import *
 
 
@@ -24,6 +24,8 @@ GENERAL_ERROR = ["NAK", 0 ]
 Handlers = {}
 INVALID_REQUEST = ["NAK",0]
 
+Server_DataBase = None
+
 #-------------------------------------------------------------
 
 def server_loop():
@@ -33,6 +35,9 @@ def server_loop():
     srvsock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR, 1)
     srvsock.bind(('', PORT) )# NOTE using '' instead of global host to bind to all interfaces
     srvsock.listen( 5 )
+    global Server_DataBase
+    Server_DataBase = DataBase.DataBase()
+    Server_DataBase.Try_Connect()
 
     while True:
         clisock, (remhost, remport) = srvsock.accept()
@@ -69,7 +74,7 @@ def server_loop():
 
 Server = threading.Thread(target=server_loop, name="Server")
 Server.daemon = True
-_DataBase = None
+
 
 
 def start_server():
@@ -79,7 +84,7 @@ def start_server():
 def persontojson(row):
 	return [row.id,row.name,row.trained,row.role]
 def persontonotes(row):
-	return [row.id,row.name,row.notes]
+	return [row.id,row.name,row.notes, row.usernotes]
 def completepersontojson(row):
 	return [row.id,row.name,row.trained,row.role,row.email,row.industry,row.created.strftime("%Y-%m-%d %H:%M:%S"),row.major,row.notes]
 #-------------------------------------------------------------
@@ -98,8 +103,8 @@ Handlers["GETVER"] = GETVER
 
 def GETLISTUSER(rcv):
 	rep = ["ACK"] 
-	global _DataBase
-	for row in _DataBase.GetUsers():
+	global Server_DataBase
+	for row in Server_DataBase.GetUsers():
 		rep.append(persontojson(row))
 	return rep
 #
@@ -107,11 +112,11 @@ Handlers["GETLISTUSER"] = GETLISTUSER
 
 def GETREPORT(rcv):
 	rep =["ACK"]
-	global _DataBase
-	for row in _DataBase.GetUsers():
-		lst = [row.id,[]]
-		for timerow in _DataBase.GetTimes(row.id):
-			lst[1].append(persontojson(row))
+	global Server_DataBase
+	for row in Server_DataBase.GetUsers():
+		lst = [row.id,row.name,[]]
+		for timerow in Server_DataBase.GetTimes(row.id):
+			lst[2].append(str(timerow.timein))
 		rep.append(lst)
 	return rep		
 #
@@ -119,8 +124,8 @@ Handlers["GETREPORT"] = GETREPORT
 	
 def GETUSER(rcv):
 	rep=["ACK"]
-	global _DataBase
-	for row in _DataBase.GetUsers():
+	global Server_DataBase
+	for row in Server_DataBase.GetUsers():
 		if row.id == rcv[1]:
 			if rcv[2] == 0:
 				rep.append(persontojson(row))
@@ -132,19 +137,19 @@ def GETUSER(rcv):
 Handlers["GETUSER"] = GETUSER
 
 def UPDATEUSER(rcv):
-	global _DataBase
+	global Server_DataBase
 	try:
-		# --- id,name,email,industry,trained,role,major,notes
-		_DataBase.EditUser(int(rcv[1]),rcv[2],rcv[3],rcv[4],int(rcv[5]),rcv[6],rcv[7],rcv[8])
+		# --- id,name,email,industry,trained,role,major,notes,usernotes
+		Server_DataBase.EditUser(int(rcv[1]),rcv[2],rcv[3],rcv[4],int(rcv[5]),rcv[6],rcv[7],rcv[8],rcv[9])
 		return ["ACK"]
 	except:
 		return GENERAL_ERROR
 Handlers["UPDATEUSER"] = UPDATEUSER
 
 def DELUSER(rcv):
-	global _DataBase
+	global Server_DataBase
 	try:
-		_DataBase.DelUser(int(rcv[1]))
+		Server_DataBase.DelUser(int(rcv[1]))
 		return ["ACK"]
 	except:
 		return GENERAL_ERROR

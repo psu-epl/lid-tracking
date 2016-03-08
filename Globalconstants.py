@@ -3,7 +3,7 @@
 
 import logging
 
-BASEFOLDER = '/home/cody/Documents/LIDTRACKING/'
+BASEFOLDER = '/home/kcp/'
 LOGFILE = BASEFOLDER + 'lid-tracking.log'
 LOGLEVEL = logging.CRITICAL
 DATABASE_FILE = BASEFOLDER + 'data.db'
